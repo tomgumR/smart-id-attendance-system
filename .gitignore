@@ -1,0 +1,12 @@
+.env
+*.db
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+node_modules/
+dist/
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/models/*.pt
+training/yolo/runs/
