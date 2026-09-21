@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     access_token_minutes: int = 480
     face_match_threshold: float = 0.45
     live_face_threshold: float = 0.45
+    insightface_model_root: str = "models/insightface"
     yolo_model_path: str = "models/id_card.pt"
     upload_directory: str = "uploads"
     allow_manual_id_fallback: bool = True

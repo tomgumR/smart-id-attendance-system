@@ -17,6 +17,8 @@ def login(data: LoginRequest, db: Annotated[Session, Depends(get_db)]) -> TokenR
     user = db.scalar(select(User).where(User.username == data.username))
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
+    if user.role != data.role:
+        raise HTTPException(status_code=403, detail="This account is not authorized for the selected role")
     return TokenResponse(access_token=create_access_token(user))
 
 

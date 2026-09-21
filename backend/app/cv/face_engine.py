@@ -1,5 +1,6 @@
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -24,12 +25,20 @@ class FaceEngine:
     def __init__(self) -> None:
         try:
             from insightface.app import FaceAnalysis
-            self.app = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"])
+            from ..config import get_settings
+
+            model_root = Path(get_settings().insightface_model_root)
+            model_root.mkdir(parents=True, exist_ok=True)
+            self.app = FaceAnalysis(
+                name="buffalo_l",
+                root=str(model_root),
+                providers=["CPUExecutionProvider"],
+            )
             self.app.prepare(ctx_id=-1, det_size=(640, 640))
         except Exception as exc:
             raise RuntimeError(
                 "InsightFace models are unavailable. Install requirements and allow the first model download, "
-                "or place the buffalo_l model under ~/.insightface/models."
+                "or place buffalo_l under the configured INSIGHTFACE_MODEL_ROOT/models directory."
             ) from exc
 
     @classmethod

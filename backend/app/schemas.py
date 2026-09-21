@@ -8,6 +8,7 @@ from .models import Role, VerificationMode
 class LoginRequest(BaseModel):
     username: str
     password: str
+    role: Role
 
 
 class TokenResponse(BaseModel):

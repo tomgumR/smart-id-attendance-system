@@ -4,9 +4,12 @@
 __pycache__/
 .pytest_cache/
 .venv/
+.python-builds/
 node_modules/
+.node/
 dist/
 backend/uploads/*
 !backend/uploads/.gitkeep
 backend/models/*.pt
+backend/models/insightface/
 training/yolo/runs/

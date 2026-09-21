@@ -1,0 +1,112 @@
+.admin-header {
+  gap: 24px;
+}
+
+.registry-tabs {
+  display: flex;
+  padding: 4px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 11px;
+}
+
+.registry-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 14px;
+  color: #66756f;
+  background: transparent;
+  font-weight: 700;
+}
+
+.registry-tabs button.active {
+  color: #fff;
+  background: var(--dark);
+}
+
+.registry-tabs svg {
+  width: 17px;
+}
+
+.professor-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.professor-list {
+  margin-top: 15px;
+  max-height: 480px;
+  overflow: auto;
+}
+
+.professor-list article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf1ef;
+}
+
+.professor-list article > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.professor-list small {
+  display: block;
+  color: #778681;
+  margin-top: 3px;
+}
+
+.professor-avatar {
+  width: 43px;
+  height: 43px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--green);
+  background: #e5f4ef;
+}
+
+.professor-avatar svg {
+  width: 20px;
+}
+
+.delete-account {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #efd6d6;
+  border-radius: 9px;
+  color: #a83939;
+  background: #fff8f8;
+}
+
+.delete-account:hover {
+  background: #ffeded;
+}
+
+.delete-account svg {
+  width: 17px;
+}
+
+@media (max-width: 700px) {
+  .admin-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .registry-tabs,
+  .registry-tabs button {
+    flex: 1;
+  }
+
+  .registry-tabs button {
+    justify-content: center;
+  }
+}

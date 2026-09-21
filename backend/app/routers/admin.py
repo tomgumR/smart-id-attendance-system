@@ -26,3 +26,17 @@ def create_user(data: UserCreate, db: Annotated[Session, Depends(get_db)], _: An
 @router.get("/users", response_model=list[UserOut])
 def list_users(db: Annotated[Session, Depends(get_db)], _: Annotated[User, Depends(require_roles(Role.ADMIN))]) -> list[User]:
     return list(db.scalars(select(User).order_by(User.username)))
+
+
+@router.get("/professors", response_model=list[UserOut])
+def list_professors(db: Annotated[Session, Depends(get_db)], _: Annotated[User, Depends(require_roles(Role.ADMIN))]) -> list[User]:
+    return list(db.scalars(select(User).where(User.role == Role.PROFESSOR).order_by(User.username)))
+
+
+@router.delete("/professors/{user_pk}", status_code=204)
+def delete_professor(user_pk: int, db: Annotated[Session, Depends(get_db)], _: Annotated[User, Depends(require_roles(Role.ADMIN))]) -> None:
+    professor = db.scalar(select(User).where(User.id == user_pk, User.role == Role.PROFESSOR))
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor not found")
+    db.delete(professor)
+    db.commit()

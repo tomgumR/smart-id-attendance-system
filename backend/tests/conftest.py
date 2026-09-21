@@ -30,5 +30,5 @@ def client():
 
 @pytest.fixture
 def admin_headers(client):
-    response = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+    response = client.post("/api/auth/login", json={"username": "admin", "password": "admin123", "role": "ADMIN"})
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
