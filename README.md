@@ -2,6 +2,8 @@
 
 A local BTech classroom prototype that identifies a student from the **face printed on an ID card**, optionally compares a live face, and records attendance. It does not use OCR, QR codes, paid APIs, or cloud recognition.
 
+For an implementation-level explanation of the architecture, database, API, role flows, computer-vision pipeline, configuration, testing, security, and troubleshooting, see the [complete project documentation](docs/PROJECT_DOCUMENTATION.md).
+
 ## Architecture
 
 `React webcam/upload → FastAPI → YOLO ID crop (or declared fallback) → InsightFace detection/alignment + ArcFace embedding → cosine 1:N search → optional live 1:1 verification → SQLite attendance`
