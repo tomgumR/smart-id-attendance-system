@@ -23,6 +23,19 @@ def test_login_rejects_account_for_wrong_selected_role(client):
     assert response.json()["detail"] == "This account is not authorized for the selected role"
 
 
+def test_loopback_frontend_origin_is_allowed(client):
+    response = client.options(
+        "/api/auth/login",
+        headers={
+            "Origin": "http://127.0.0.1:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
+
+
 def test_admin_can_create_list_and_delete_professor(client, admin_headers):
     created = client.post(
         "/api/admin/users",
