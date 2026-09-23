@@ -10,7 +10,7 @@ The application has three roles:
 
 All recognition and data storage run locally. The project does not use cloud recognition, paid APIs, OCR, or QR codes.
 
-For implementation details, diagrams, database design, API documentation, and security notes, read the [complete project documentation](docs/PROJECT_DOCUMENTATION.md).
+For a detailed explanation of the project and how it works, see the [project documentation in the `docs` folder](docs/PROJECT_DOCUMENTATION.md). It includes the architecture, role workflows, database design, computer-vision pipeline, API reference, and security notes.
 
 ## Contents
 
