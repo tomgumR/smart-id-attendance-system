@@ -57,14 +57,47 @@ flowchart LR
     CV --> DB
 ```
 
+The components run as two local processes:
+
+- the Vite development server serves the React application on port 5173;
+- Uvicorn serves the FastAPI application on port 8000.
+
+The browser never connects directly to SQLite, the upload directory, InsightFace, or YOLO. Every protected operation goes through FastAPI, which authenticates the bearer token, authorizes the current database user, validates the request, and then invokes the required database or computer-vision service.
+
+### 2.1 Backend startup lifecycle
+
+Importing `backend/app/main.py` performs the following startup work:
+
+1. load and cache settings from defaults and `backend/.env`;
+2. create the configured upload directory when it is missing;
+3. call SQLAlchemy `create_all()` to create missing database tables;
+4. construct the FastAPI application and CORS middleware;
+5. mount the upload directory at `/uploads`;
+6. register authentication, administration, student, verification, and attendance routers;
+7. register the health endpoint and generic unexpected-error handler.
+
+The computer-vision models are deliberately excluded from this startup path. InsightFace initializes lazily on the first student-registration or ID-verification request, which keeps ordinary API startup fast and makes a missing model surface only when a CV operation is requested.
+
+### 2.2 Request and response formats
+
+The frontend sends three kinds of requests:
+
+- JSON for login and user creation;
+- `multipart/form-data` for student photographs and ID images;
+- query parameters for attendance search, date filters, pagination, summary dates, and CSV export.
+
+FastAPI validates JSON and query values through Pydantic schemas and typed route parameters. SQLAlchemy sessions are created per request by `get_db()` and closed in a `finally` block. API data returns as JSON except for the CSV export and static registered photographs.
+
 The default development addresses are:
 
 | Component | Address |
 |---|---|
-| Frontend | `http://localhost:5173` |
-| Backend API | `http://localhost:8000` |
-| Interactive API docs | `http://localhost:8000/docs` |
-| Health check | `http://localhost:8000/api/health` |
+| Frontend | `http://127.0.0.1:5173` |
+| Backend API | `http://127.0.0.1:8000` |
+| Interactive API docs | `http://127.0.0.1:8000/docs` |
+| Health check | `http://127.0.0.1:8000/api/health` |
+
+Both `localhost:5173` and `127.0.0.1:5173` are permitted frontend origins. The documented run commands use `127.0.0.1` consistently.
 
 All persisted application data remains local:
 
@@ -331,6 +364,8 @@ Stores the attendance evidence and the guard responsible for the record.
 
 The combination of `student_id` and `attendance_date` has a database-level unique constraint. The service also checks for an existing row before insertion. The constraint is the final protection against concurrent duplicate requests.
 
+`verification_mode` currently has one valid value, `ID_ONLY`. It remains an explicit field so attendance records state how they were produced and so a future verification method can be introduced through a deliberate schema change.
+
 The recorded evidence includes:
 
 - UTC timestamp;
@@ -540,9 +575,20 @@ A verification response may contain:
   },
   "similarity_score": 0.71,
   "second_best_score": 0.34,
-  "attendance": {}
+  "attendance": {
+    "id": 42,
+    "student_id": "CSE-001",
+    "name": "Example Student",
+    "department": "CSE",
+    "timestamp": "2026-09-24T08:30:00Z",
+    "verification_mode": "ID_ONLY",
+    "similarity_score": 0.71,
+    "security_username": "guard1"
+  }
 }
 ```
+
+An unknown face still returns a successful HTTP response containing status `UNKNOWN`, because the request was valid and the recognition decision completed normally. Invalid images return `422`; an unavailable model returns `503`.
 
 ### 10.5 Attendance reporting
 
@@ -565,6 +611,23 @@ List and export filters:
 | `limit` | List endpoint page size, default `100`, maximum `500` |
 
 The summary endpoint also accepts an optional `day` query parameter. The frontend currently requests the default current day.
+
+### 10.6 Response and error conventions
+
+| HTTP status | Meaning in this project |
+|---|---|
+| `200` | Successful read, login, completed verification decision, or CSV response |
+| `201` | User or student created |
+| `204` | Professor or student deleted |
+| `401` | Incorrect login, invalid token, expired token, or deleted token owner |
+| `403` | Authenticated account has the wrong role or selected the wrong login role |
+| `404` | Requested student/professor route resource does not exist |
+| `409` | Duplicate username or student ID |
+| `422` | Request validation, invalid image, missing face, multiple faces, or detector failure |
+| `503` | InsightFace/model initialization is unavailable |
+| `500` | Unexpected server error; details are logged server-side |
+
+The global exception handler deliberately returns a generic `500` message instead of exposing internal exception details to the browser.
 
 ## 11. Frontend architecture
 
@@ -591,7 +654,7 @@ The backend remains the authority; hiding frontend controls is not relied upon f
 
 `frontend/src/api.js` defines the API base URL and shared request behavior:
 
-- default API URL: `http://localhost:8000/api`;
+- default API URL: `http://<current-browser-hostname>:8000/api`;
 - override: Vite environment variable `VITE_API_URL`;
 - adds bearer token when present;
 - adds JSON content type for non-`FormData` request bodies;
@@ -604,7 +667,7 @@ The backend remains the authority; hiding frontend controls is not relied upon f
 
 Camera tracks are stopped when the component unmounts. If browser permission is unavailable, the UI tells the guard to upload an image instead.
 
-Camera access generally requires `localhost` or HTTPS because browsers restrict `getUserMedia()` on insecure remote origins.
+Camera access generally requires a trustworthy loopback origin such as `localhost`/`127.0.0.1` or HTTPS because browsers restrict `getUserMedia()` on insecure remote origins.
 
 ## 12. Configuration
 
@@ -619,7 +682,7 @@ Backend settings are read from `backend/.env` through Pydantic Settings. Copy `.
 | `YOLO_MODEL_PATH` | `models/id_card.pt` | Optional trained card-detector weights |
 | `UPLOAD_DIRECTORY` | `uploads` | Local registered-photo directory |
 | `ALLOW_MANUAL_ID_FALLBACK` | `true` | Treat full image as an already cropped card when YOLO weights are missing |
-| `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated permitted frontend origins |
+| `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated permitted frontend origins |
 
 Other backend defaults in `config.py` include:
 
@@ -677,10 +740,12 @@ Use Node.js 20 or newer:
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev -- --host 127.0.0.1
 ```
 
-Open `http://localhost:5173`.
+Open `http://127.0.0.1:5173`.
+
+For the exact one-time Linux installation and everyday two-terminal run commands used by the current checkout, follow the repository [README](../README.md). The README is the operational setup guide; this document explains the implementation behind those commands.
 
 ### 13.3 Windows backend
 
@@ -730,10 +795,14 @@ The current automated suite verifies:
 - successful login and `/auth/me`;
 - denial of an unauthorized admin endpoint;
 - rejection when the selected login role does not match the account;
+- successful CORS preflight from `http://127.0.0.1:5173`;
 - professor creation, listing, deletion, and failed login after deletion;
 - prevention of duplicate daily attendance;
 - selection of the best cosine match;
-- rejection below the configured similarity threshold.
+- rejection below the configured similarity threshold;
+- presence of the ID-image verification endpoint and absence of the removed ID-plus-live endpoint.
+
+The current suite contains nine tests.
 
 The test suite uses `backend/test_smart_attendance.db`, drops and recreates tables around each test, and seeds a test admin.
 
@@ -889,11 +958,12 @@ Check that:
 - FastAPI is running on port 8000;
 - the frontend API URL is correct;
 - `CORS_ORIGINS` contains the exact frontend origin, including hostname and port;
-- `localhost` and `127.0.0.1` are not being mixed when only one is allowed.
+- the default configuration still includes both `http://localhost:5173` and `http://127.0.0.1:5173`;
+- the backend was restarted after any `.env` change.
 
 ### Camera does not start
 
-Grant camera permission, use `http://localhost:5173`, and verify that no other program holds the camera. Image upload remains available when camera access fails.
+Grant camera permission, use `http://127.0.0.1:5173`, and verify that no other program holds the camera. Image upload remains available when camera access fails.
 
 ### Login returns `403`
 
@@ -915,7 +985,7 @@ The username/password is incorrect, the token is invalid or expired, or the corr
 - Student deletion removes the database row but the current route does not explicitly remove the stored photograph.
 - Formal course, class session, enrollment, timetable, and per-subject attendance models are not implemented.
 - Attendance uniqueness is per student and calendar day, not per course session.
-- Dates are derived from application/server time; timezone administration is not exposed in the UI.
+- New attendance timestamps and `attendance_date` values are created from UTC. The reporting endpoints default their requested day using the backend host's local date, so deployments outside UTC should define and test the intended day-boundary behavior.
 - The frontend stores the JWT in `localStorage`; a hardened network deployment should review session storage and XSS protections.
 - SQLite and local file storage are appropriate for a local prototype but require a different operational design for concurrent multi-server deployment.
 
