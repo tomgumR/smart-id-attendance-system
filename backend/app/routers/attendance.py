@@ -62,7 +62,7 @@ def export_csv(
     rows = db.scalars(filtered_query(search, department, start_date, end_date)).all()
     output = io.StringIO(newline="")
     writer = csv.writer(output)
-    writer.writerow(["Student ID", "Name", "Department", "Date", "Time", "Verification Method", "ID Similarity", "Live Similarity", "Guard"])
+    writer.writerow(["Student ID", "Name", "Department", "Date", "Time", "Verification Method", "ID Similarity", "Guard"])
     for row in rows:
-        writer.writerow([row.student.student_id, row.student.name, row.student.department, row.timestamp.date(), row.timestamp.time().replace(microsecond=0), row.verification_mode.value, f"{row.similarity_score:.4f}", "" if row.live_similarity_score is None else f"{row.live_similarity_score:.4f}", row.security_user.username])
+        writer.writerow([row.student.student_id, row.student.name, row.student.department, row.timestamp.date(), row.timestamp.time().replace(microsecond=0), row.verification_mode.value, f"{row.similarity_score:.4f}", row.security_user.username])
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=attendance.csv"})

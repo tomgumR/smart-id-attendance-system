@@ -19,7 +19,6 @@ class Role(str, enum.Enum):
 
 class VerificationMode(str, enum.Enum):
     ID_ONLY = "ID_ONLY"
-    ID_LIVE = "ID_LIVE"
 
 
 class User(Base):
@@ -57,7 +56,6 @@ class Attendance(Base):
     attendance_date: Mapped[str] = mapped_column(String(10), index=True)
     verification_mode: Mapped[VerificationMode] = mapped_column(Enum(VerificationMode))
     similarity_score: Mapped[float] = mapped_column(Float)
-    live_similarity_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     security_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     student: Mapped[Student] = relationship(back_populates="attendance")

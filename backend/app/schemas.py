@@ -49,7 +49,6 @@ class AttendanceOut(BaseModel):
     timestamp: datetime
     verification_mode: VerificationMode
     similarity_score: float
-    live_similarity_score: float | None
     security_username: str
 
 
@@ -59,7 +58,6 @@ class VerificationResult(BaseModel):
     student: StudentOut | None = None
     similarity_score: float | None = None
     second_best_score: float | None = None
-    live_similarity_score: float | None = None
     attendance: AttendanceOut | None = None
 
 

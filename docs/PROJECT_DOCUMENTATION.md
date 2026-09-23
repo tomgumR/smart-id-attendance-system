@@ -27,7 +27,7 @@ This document explains the current implementation of Smart ID Attendance in deta
 
 ## 1. Purpose and scope
 
-Smart ID Attendance is a local university attendance prototype. It identifies a registered student from the face printed on a student ID card and records one attendance entry per student per calendar day. A guard can optionally provide a second, live-face image so the system also verifies that the person presenting the card resembles the registered student.
+Smart ID Attendance is a local university attendance prototype. It identifies a registered student from the face printed on a student ID card and records one attendance entry per student per calendar day.
 
 The application provides three roles:
 
@@ -37,10 +37,7 @@ The application provides three roles:
 
 The system runs locally. It does not use cloud face-recognition services, paid APIs, OCR, or QR codes. Face recognition uses InsightFace and an ArcFace-compatible pretrained model through ONNX Runtime.
 
-The application has two verification modes:
-
-- **ID only (`ID_ONLY`)**: identify the face found on the submitted ID-card image.
-- **ID + live (`ID_LIVE`)**: identify the ID-card face, then compare a second image against the identified student's stored embedding.
+The application uses ID-only verification (`ID_ONLY`): it identifies the face found on the submitted ID-card image.
 
 ## 2. System architecture
 
@@ -123,7 +120,7 @@ smart-id-attendance-system/
 │   │   │   ├── attendance.py       # Lists, summaries, and CSV export
 │   │   │   ├── auth.py             # Login and current-user endpoint
 │   │   │   ├── students.py         # Student registry
-│   │   │   └── verification.py     # ID-only and ID+live verification
+│   │   │   └── verification.py     # ID-card verification
 │   │   ├── auth.py                 # Passwords, JWTs, and RBAC dependencies
 │   │   ├── config.py               # Environment-backed settings
 │   │   ├── database.py             # Engine, declarative base, sessions
@@ -184,8 +181,7 @@ After choosing **Guard**, a `SECURITY` account reaches the scanner dashboard.
 The guard can:
 
 - start the browser camera or upload an ID image;
-- choose **ID only** or **ID + live face**;
-- submit the image or images for verification;
+- submit the ID image for verification;
 - see the status, identified student, similarity scores, and message;
 - see the 20 most recent attendance entries for the current day.
 
@@ -196,7 +192,6 @@ The possible result statuses are:
 | `RECORDED` | Identity passed and a new daily attendance entry was created |
 | `DUPLICATE` | Identity passed, but attendance already existed for that day |
 | `UNKNOWN` | No registered embedding passed the identification threshold |
-| `LIVE_MISMATCH` | The ID matched, but the live image failed the live threshold |
 | `ERROR` | The frontend received or generated an error during the request |
 
 ### 5.3 Professor
@@ -209,7 +204,7 @@ The professor can:
 - search by student name or student ID;
 - filter by exact department;
 - filter by start and end dates;
-- inspect verification method, ID score, live score, and guard username;
+- inspect verification method, ID score, and guard username;
 - export the filtered result set as `attendance.csv`.
 
 ## 6. Authentication and authorization
@@ -263,7 +258,6 @@ For every protected request, the backend validates the signature and expiry, rea
 | Register/delete students | Yes | No | No |
 | List students | Yes | No | Yes |
 | Verify an ID image | Yes | Yes | No |
-| Verify ID + live image | Yes | Yes | No |
 | View today's recent attendance | Yes | Yes | No |
 | View/filter all attendance | Yes | No | Yes |
 | View attendance summary | Yes | No | Yes |
@@ -306,7 +300,6 @@ erDiagram
         string attendance_date
         enum verification_mode
         float similarity_score
-        float live_similarity_score
         integer security_user_id FK
         datetime created_at
     }
@@ -344,7 +337,6 @@ The recorded evidence includes:
 - calendar date string;
 - verification mode;
 - ID similarity score;
-- optional live similarity score;
 - the security/admin user that recorded it.
 
 ## 8. Computer-vision pipeline
@@ -428,20 +420,6 @@ accepted = best_similarity >= FACE_MATCH_THRESHOLD
 
 The default threshold is `0.45`. It is a starting value for the prototype, not a universal biometric threshold.
 
-### 8.5 Optional live comparison
-
-ID + live mode first performs normal 1:N identification using the ID image. If a student is identified, the backend extracts one embedding from the live image and performs a 1:1 cosine comparison against the student's registered embedding.
-
-Attendance is recorded only if:
-
-```text
-live_similarity >= LIVE_FACE_THRESHOLD
-```
-
-The default live threshold is also `0.45`.
-
-This is face comparison, not liveness detection. A photograph or replay attack may still pass if it produces a sufficiently similar embedding.
-
 ## 9. Attendance processing
 
 ```mermaid
@@ -454,10 +432,6 @@ sequenceDiagram
     G->>API: Authenticated image request
     API->>CV: Crop card and extract face
     CV-->>API: Best identity and score
-    opt ID + live
-        API->>CV: Extract live face and compare
-        CV-->>API: Live similarity
-    end
     API->>DB: Look for same student/date
     alt No attendance exists
         API->>DB: Insert attendance
@@ -546,11 +520,8 @@ Registration uses `multipart/form-data` fields:
 | Method | Route | Access | Purpose |
 |---|---|---|---|
 | `POST` | `/api/verification/id-image` | Guard, Admin | ID-only identification and attendance |
-| `POST` | `/api/verification/id-live` | Guard, Admin | ID identification plus live 1:1 comparison |
 
 `id-image` accepts multipart field `image`.
-
-`id-live` accepts multipart fields `id_image` and `live_image`.
 
 A verification response may contain:
 
@@ -569,7 +540,6 @@ A verification response may contain:
   },
   "similarity_score": 0.71,
   "second_best_score": 0.34,
-  "live_similarity_score": null,
   "attendance": {}
 }
 ```
@@ -645,7 +615,6 @@ Backend settings are read from `backend/.env` through Pydantic Settings. Copy `.
 | `DATABASE_URL` | `sqlite:///./smart_attendance.db` | SQLAlchemy database URL |
 | `JWT_SECRET` | placeholder | JWT signing secret; replace outside local demo use |
 | `FACE_MATCH_THRESHOLD` | `0.45` | Minimum 1:N ID similarity |
-| `LIVE_FACE_THRESHOLD` | `0.45` | Minimum 1:1 live similarity |
 | `INSIGHTFACE_MODEL_ROOT` | `models/insightface` | InsightFace root directory |
 | `YOLO_MODEL_PATH` | `models/id_card.pt` | Optional trained card-detector weights |
 | `UPLOAD_DIRECTORY` | `uploads` | Local registered-photo directory |
@@ -940,7 +909,6 @@ The username/password is incorrect, the token is invalid or expired, or the corr
 - 1:N matching loads all students and performs a linear scan, which suits a small registry but not a large deployment.
 - The repository does not include trained ID-card detector weights.
 - The full-image fallback assumes the uploaded image is already tightly cropped around the card.
-- ID + live verifies facial similarity but does not implement liveness or anti-spoofing.
 - Similarity thresholds require local calibration and fairness evaluation.
 - Tables are created with `create_all`; schema migrations are not implemented.
 - Account password reset, account deactivation, and audit logs are not implemented.
@@ -964,7 +932,6 @@ The current architecture can be extended without replacing the CV pipeline:
 - paginate professor-facing tables in the UI using the existing API offset and limit parameters;
 - introduce a vector index only when registry size justifies it;
 - add calibrated ambiguity handling using the best/second-best score margin;
-- add a dedicated liveness model for anti-spoofing;
 - add managed deletion of student photos and attendance according to a retention policy;
 - add a production frontend/API deployment configuration while keeping inference local.
 
